@@ -1,0 +1,11 @@
+# config/services_test.yaml
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    # Test env’e vietoj tikro IpstackClient naudosim mūsų mock
+    App\Service\IpstackClient:
+        class: App\Tests\Mock\IpstackClientMock
+

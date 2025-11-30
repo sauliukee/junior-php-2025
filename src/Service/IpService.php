@@ -20,23 +20,25 @@ class IpService
 
     public function getIpInfo(string $ip): IpAddress
     {
-        // 1) blacklist check
+        $this->assertValidIp($ip);
+
+        # 1) blacklist check
         if ($this->blacklistedIpRepository->findOneBy(['ip' => $ip])) {
             throw new \RuntimeException('IP is blacklisted');
         }
 
-        // 2) ieškome DB
+        # 2) ieškome DB
         $ipEntity = $this->ipAddressRepository->findOneBy(['ip' => $ip]);
 
         $now = new \DateTimeImmutable();
         $oneDayAgo = $now->modify('-1 day');
 
-        // 3) jei yra ir ne senesnis nei 1 diena – grąžinam cached
+        # 3) jei yra ir ne senesnis nei 1 diena – grąžinam cached
         if ($ipEntity !== null && $ipEntity->getUpdatedAt() >= $oneDayAgo) {
             return $ipEntity;
         }
 
-        // 4) reikia naujų duomenų iš ipstack
+        # 4) reikia naujų duomenų iš ipstack
         $data = $this->ipstackClient->fetchIpData($ip);
 
         if ($ipEntity === null) {
@@ -57,8 +59,46 @@ class IpService
         return $ipEntity;
     }
 
+    /**
+     * Bulk IP info – bonus endpointui.
+     * Grąžina masyvą su success/error per IP.
+     */
+    public function getIpInfoBulk(array $ips): array
+    {
+        $results = [];
+
+        foreach ($ips as $ip) {
+            # saugumo sumetimais – tipas string
+            $ip = (string) $ip;
+
+            try {
+                $entity = $this->getIpInfo($ip);
+
+                $results[] = [
+                    'ip'        => $entity->getIp(),
+                    'country'   => $entity->getCountry(),
+                    'city'      => $entity->getCity(),
+                    'latitude'  => $entity->getLatitude(),
+                    'longitude' => $entity->getLongitude(),
+                    'updatedAt' => $entity->getUpdatedAt()->format(DATE_ATOM),
+                    'success'   => true,
+                ];
+            } catch (\Throwable $e) {
+                $results[] = [
+                    'ip'      => $ip,
+                    'success' => false,
+                    'error'   => $e->getMessage(),
+                ];
+            }
+        }
+
+        return $results;
+    }
+
     public function deleteIp(string $ip): void
     {
+        $this->assertValidIp($ip);
+
         $ipEntity = $this->ipAddressRepository->findOneBy(['ip' => $ip]);
 
         if (!$ipEntity) {
@@ -71,19 +111,56 @@ class IpService
 
     public function addToBlacklist(string $ip): void
     {
+        $this->assertValidIp($ip);
+
         if ($this->blacklistedIpRepository->findOneBy(['ip' => $ip])) {
-            return; // jau yra – nieko nedarom
+            return; 
         }
 
         $blacklisted = new BlacklistedIp();
         $blacklisted->setIp($ip);
 
+        $ipEntity = $this->ipAddressRepository->findOneBy(['ip' => $ip]);
+        if ($ipEntity) {
+            $blacklisted->setIpAddress($ipEntity);
+        }
+
         $this->em->persist($blacklisted);
         $this->em->flush();
     }
 
+    /**
+     * Bulk add to blacklist.
+     */
+    public function addToBlacklistBulk(array $ips): array
+    {
+        $results = [];
+
+        foreach ($ips as $ip) {
+            $ip = (string) $ip;
+
+            try {
+                $this->addToBlacklist($ip);
+                $results[] = [
+                    'ip'      => $ip,
+                    'success' => true,
+                ];
+            } catch (\Throwable $e) {
+                $results[] = [
+                    'ip'      => $ip,
+                    'success' => false,
+                    'error'   => $e->getMessage(),
+                ];
+            }
+        }
+
+        return $results;
+    }
+
     public function removeFromBlacklist(string $ip): void
     {
+        $this->assertValidIp($ip);
+
         $entity = $this->blacklistedIpRepository->findOneBy(['ip' => $ip]);
 
         if (!$entity) {
@@ -92,5 +169,40 @@ class IpService
 
         $this->em->remove($entity);
         $this->em->flush();
+    }
+
+    /**
+     * Bulk remove from blacklist.
+     */
+    public function removeFromBlacklistBulk(array $ips): array
+    {
+        $results = [];
+
+        foreach ($ips as $ip) {
+            $ip = (string) $ip;
+
+            try {
+                $this->removeFromBlacklist($ip);
+                $results[] = [
+                    'ip'      => $ip,
+                    'success' => true,
+                ];
+            } catch (\Throwable $e) {
+                $results[] = [
+                    'ip'      => $ip,
+                    'success' => false,
+                    'error'   => $e->getMessage(),
+                ];
+            }
+        }
+
+        return $results;
+    }
+
+    private function assertValidIp(string $ip): void
+    {
+        if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+            throw new \InvalidArgumentException('Invalid IP address');
+        }
     }
 }

@@ -25,6 +25,9 @@ class IpAddress
     #[ORM\Column(nullable: true)]
     private ?float $latitude = null;
 
+    #[ORM\Column(nullable: true)]
+    private ?float $longitude = null;
+
     #[ORM\Column]
     private ?\DateTimeImmutable $updatedAt = null;
 
@@ -77,6 +80,18 @@ class IpAddress
     public function setLatitude(?float $latitude): static
     {
         $this->latitude = $latitude;
+
+        return $this;
+    }
+
+    public function getLongitude(): ?float
+    {
+        return $this->longitude;
+    }
+
+    public function setLongitude(?float $longitude): static
+    {
+        $this->longitude = $longitude;
 
         return $this;
     }
