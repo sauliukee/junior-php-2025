@@ -54,21 +54,34 @@ External ipstack calls are fully mocked.
 
 ### Setup
 
-```bash
-# 1. Clone repository
+1. Clone repository
+   
+```
 git clone <your-repo-url>
 cd junior-php-2025
+```
 
-# 2. Start Docker stack
+2. Start Docker stack
+
+```
 docker compose up -d
+```
 
-# 3. Install PHP dependencies
+3. Install PHP dependencies
+
+```
 docker compose exec php composer install
+```
 
-# 4. Run migrations
+4. Run migrations
+   
+```
 docker compose exec php bin/console doctrine:migrations:migrate --no-interaction
+```
 
-# 5. Access documentation
+5. Access documentation
+
+```
 open http://localhost:8080/api/doc
 ```
 
@@ -150,12 +163,12 @@ Tests:
 
 ## Evaluation Criteria Checklist
 
-REST API implemented: yes  
-Cache logic implemented: yes  
-External API usage: yes  
-Blacklist logic: yes  
-Bulk endpoints implemented: yes  
-OpenAPI documentation: yes  
-Docker environment: yes  
-Tests included: yes  
-Code readability: yes  
+REST API implemented: **yes**
+Cache logic implemented: **yes**
+External API usage: **yes**  
+Blacklist logic: **yes**
+Bulk endpoints implemented: **yes**
+OpenAPI documentation: **yes**
+Docker environment: **yes**
+Tests included: **yes**  
+Code readability: **yes**  
