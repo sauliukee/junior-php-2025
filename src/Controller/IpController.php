@@ -9,6 +9,14 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 
+/**
+ * Controlleris, kuris valdo IP API endpoint'us.
+ *
+ * Čia:
+ *  - grąžinu informaciją apie vieną IP (naudojant cache ir IP entity),
+ *  - leidžiu ištrinti cache įrašą,
+ *  - turiu bulk endpoint'ą keliems IP iš karto.
+ */
 class IpController extends AbstractController
 {
     #[Route('/api/ip/{ip}', name: 'api_ip_get', methods: ['GET'])]
@@ -79,6 +87,7 @@ class IpController extends AbstractController
                 return $this->json(['error' => $e->getMessage()], 403);
             }
 
+            // Kitoms runtime klaidoms grąžinu 400
             return $this->json(['error' => $e->getMessage()], 400);
         }
     }

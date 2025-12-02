@@ -7,6 +7,11 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Annotation\Route;
 
+/**
+ * Paprastas controlleris health-check endpoint'ui.
+ *
+ * Naudojamas patikrinti, ar API gyvas ir pasiekiamas.
+ */
 class ApiController extends AbstractController
 {
     #[Route('/api/health', name: 'api_health', methods: ['GET'])]

@@ -5,7 +5,3 @@ services:
         autowire: true
         autoconfigure: true
 
-    # Test env’e vietoj tikro IpstackClient naudosim mūsų mock
-    App\Service\IpstackClient:
-        class: App\Tests\Mock\IpstackClientMock
-

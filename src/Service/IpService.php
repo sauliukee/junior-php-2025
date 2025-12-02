@@ -8,6 +8,16 @@ use App\Repository\IpAddressRepository;
 use App\Repository\BlacklistedIpRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
+/**
+ * Servisas, kuris sukelia visą IP logiką į vieną vietą.
+ *
+ * Čia darau:
+ *  - IP informacijos gavimą su paprastu cache (1 dienos galiojimas),
+ *  - Blacklist tikrinimą ir valdymą,
+ *  - bulk operacijas (kelios IP vienu metu).
+ *
+ * Controlleriai kviečia šitą servisą, kad nereiktų kartoti logikos.
+ */
 class IpService
 {
     public function __construct(
@@ -18,35 +28,53 @@ class IpService
     ) {
     }
 
+    /**
+     * Grąžina informaciją apie IP iš lokalaus cache arba ipstack.
+     *
+     * Logika:
+     *  - pirmiausia patikrinam IP formatą,
+     *  - tada tikrinam, ar IP nėra blackliste,
+     *  - jei duomenys DB ir ne senesni nei 1 diena – gražinam cache,
+     *  - kitu atveju kviečiam ipstack, atnaujinam/įrašom ir gražinam.
+     *
+     * @param string $ip IPv4 arba IPv6 adresas.
+     *
+     * @return IpAddress IP duomenų entity iš DB.
+     *
+     * @throws \InvalidArgumentException jei IP formatas neteisingas.
+     * @throws \RuntimeException         jei IP yra blackliste arba ipstack grąžina klaidą.
+     */
     public function getIpInfo(string $ip): IpAddress
     {
         $this->assertValidIp($ip);
 
-        # 1) blacklist check
+        // 1) Pirma stabdom, jei IP yra blackliste
         if ($this->blacklistedIpRepository->findOneBy(['ip' => $ip])) {
             throw new \RuntimeException('IP is blacklisted');
         }
 
-        # 2) ieškome DB
+        // 2) Bandom rasti cache (DB įrašą)
         $ipEntity = $this->ipAddressRepository->findOneBy(['ip' => $ip]);
 
         $now = new \DateTimeImmutable();
         $oneDayAgo = $now->modify('-1 day');
 
-        # 3) jei yra ir ne senesnis nei 1 diena – grąžinam cached
+        // 3) Jei turim įrašą ir jis ne senesnis nei 1 diena – tiesiog grąžinam
         if ($ipEntity !== null && $ipEntity->getUpdatedAt() >= $oneDayAgo) {
             return $ipEntity;
         }
 
-        # 4) reikia naujų duomenų iš ipstack
+        // 4) Reikia naujų duomenų – kviečiam ipstack
         $data = $this->ipstackClient->fetchIpData($ip);
 
+        // Jei DB nėra šito IP, sukuriam naują entity
         if ($ipEntity === null) {
             $ipEntity = new IpAddress();
             $ipEntity->setIp($ip);
             $this->em->persist($ipEntity);
         }
 
+        // Atnaujinam laukus pagal ipstack atsakymą
         $ipEntity
             ->setCountry($data['country_name'] ?? null)
             ->setCity($data['city'] ?? null)
@@ -60,15 +88,21 @@ class IpService
     }
 
     /**
-     * Bulk IP info – bonus endpointui.
-     * Grąžina masyvą su success/error per IP.
+     * Bulk versija – leidžia gauti info keliems IP vienu metu.
+     *
+     * Kiekvienam IP kviečia getIpInfo(), bet klaidų nemeta:
+     * jei įvyksta klaida, grąžina success=false ir error žinutę.
+     *
+     * @param string[] $ips IP adresų sąrašas.
+     *
+     * @return array Masyvas su rezultatais per IP (success/error).
      */
     public function getIpInfoBulk(array $ips): array
     {
         $results = [];
 
         foreach ($ips as $ip) {
-            # saugumo sumetimais – tipas string
+            // Saugumo sumetimais – paverčiam į string
             $ip = (string) $ip;
 
             try {
@@ -95,6 +129,16 @@ class IpService
         return $results;
     }
 
+    /**
+     * Ištrina vieno IP cache įrašą iš DB.
+     *
+     * ipstack čia nekviečiam – tiesiog pašalinam lokalius duomenis.
+     *
+     * @param string $ip IP adresas, kurio cache norim ištrinti.
+     *
+     * @throws \InvalidArgumentException jei IP formatas neteisingas.
+     * @throws \RuntimeException         jei IP DB nerastas.
+     */
     public function deleteIp(string $ip): void
     {
         $this->assertValidIp($ip);
@@ -109,17 +153,29 @@ class IpService
         $this->em->flush();
     }
 
+    /**
+     * Prideda IP adresą į blacklistą.
+     *
+     * Jei IP jau yra blackliste – nieko nedarom.
+     * Jei DB turim IpAddress įrašą, susiejam juos tarpusavyje (patogiau vėliau debuginti).
+     *
+     * @param string $ip IP adresas, kurį norim užblokuoti.
+     *
+     * @throws \InvalidArgumentException jei IP formatas neteisingas.
+     */
     public function addToBlacklist(string $ip): void
     {
         $this->assertValidIp($ip);
 
+        // Jei IP jau yra blackliste, kartoti nereikia
         if ($this->blacklistedIpRepository->findOneBy(['ip' => $ip])) {
-            return; 
+            return;
         }
 
         $blacklisted = new BlacklistedIp();
         $blacklisted->setIp($ip);
 
+        // Jei IP jau turime cache lentelėje – pririšam entity
         $ipEntity = $this->ipAddressRepository->findOneBy(['ip' => $ip]);
         if ($ipEntity) {
             $blacklisted->setIpAddress($ipEntity);
@@ -130,7 +186,13 @@ class IpService
     }
 
     /**
-     * Bulk add to blacklist.
+     * Bulk versija blacklist – keli IP vienu metu.
+     *
+     * Nekelia exception į viršų – kaip ir kitur, grąžina success/error per IP.
+     *
+     * @param string[] $ips IP adresai, kuriuos norim užblokuoti.
+     *
+     * @return array IP rezultatai su success/error.
      */
     public function addToBlacklistBulk(array $ips): array
     {
@@ -157,6 +219,14 @@ class IpService
         return $results;
     }
 
+    /**
+     * Pašalina vieną IP iš juodojo sąrašo.
+     *
+     * @param string $ip IP adresas, kurį norim išimti iš blacklist.
+     *
+     * @throws \InvalidArgumentException jei IP formatas neteisingas.
+     * @throws \RuntimeException         jei šitas IP apskritai nėra blackliste.
+     */
     public function removeFromBlacklist(string $ip): void
     {
         $this->assertValidIp($ip);
@@ -172,7 +242,13 @@ class IpService
     }
 
     /**
-     * Bulk remove from blacklist.
+     * Bulk versija removeFromBlacklist() metodui.
+     *
+     * Vėlgi – čia exception’ų nekeliam į viršų, o grąžinam statusą per IP.
+     *
+     * @param string[] $ips IP adresai, kuriuos norim išimti iš blacklist.
+     *
+     * @return array IP success/error rezultatai.
      */
     public function removeFromBlacklistBulk(array $ips): array
     {
@@ -199,6 +275,15 @@ class IpService
         return $results;
     }
 
+    /**
+     * Patikrina, ar IP adresas sintaksiškai teisingas.
+     *
+     * Visos public šitos klasės funkcijos naudoja tą pačią validaciją.
+     *
+     * @param string $ip IP adresas, kurį tikrinam.
+     *
+     * @throws \InvalidArgumentException jei IP nėra validus IPv4/IPv6.
+     */
     private function assertValidIp(string $ip): void
     {
         if (!filter_var($ip, FILTER_VALIDATE_IP)) {

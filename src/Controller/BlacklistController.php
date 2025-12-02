@@ -9,6 +9,14 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Annotation\Route;
 
+/**
+ * Controlleris, kuris valdo blacklist API endpoint'us.
+ *
+ * Čia sudėta logika:
+ *  - pridėti vieną IP į blacklist,
+ *  - išimti IP iš blacklist,
+ *  - atlikti bulk operacijas su keliais IP vienu metu.
+ */
 class BlacklistController extends AbstractController
 {
     #[Route('/api/blacklist', name: 'api_blacklist_add', methods: ['POST'])]
