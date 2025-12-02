@@ -130,33 +130,6 @@ Tests:
 
 ---
 
-## Data Flow Overview
-
-User Request (GET /api/ip/{ip})
-        |
-        v
-    IpController
-        |
-        v
-     IpService
-        |
-        |-- 1. Validate IP format
-        |
-        |-- 2. Check blacklist table
-        |       If blacklisted -> return 403
-        |
-        |-- 3. Check local database (IpAddress entity)
-        |       If exists and updatedAt < 1 day -> return cached entity
-        |
-        |-- 4. Call ipstack via IpstackClient
-        |
-        |-- 5. Save or update IpAddress entity
-        |
-        v
-Return JSON response
-
----
-
 ## Evaluation Criteria Checklist
 
 REST API implemented: yes  
