@@ -1,50 +1,170 @@
-# Junior PHP Developer (Symfony focus) Assignment 
+# IP Information API - Saulė Einikytė
 
-## Task Description
-The goal of this assignment is to create a RESTful API using Symfony 6 and PHP 8.4 that manages IP address information. The API will interact with a third-party service, ipstack.com, to fetch IP data and will implement a caching and blacklisting system.
+This project is a solution for the Junior PHP Developer (Symfony focus) assignment.
+The goal of the API is to retrieve IP information from ipstack.com, cache it locally for one day, manage a blacklist, and provide bulk operations.
 
-The project should be built with given scaffolding, demonstrating your ability working with symfony, configure services, handle API calls, and interact with a database.
+The project is built with Symfony 6, PHP 8.4, Doctrine ORM, Docker and is documented using OpenAPI.
 
-This task is scoped to be doable in ~4 hours (one evening) for a junior developer with some Symfony knowledge.
+---
 
-## Core Functionality
-1. Retrieve IP Information
-    - When a request is made for a specific IP address, the application must first check its local database.
-    - If the IP exists in the database and the data is not older than one day, return the cached information.
-    - If the IP exists but the data is older than one day, fetch fresh data from the ipstack.com API, update the record in the database, and then return the updated information.
-    - If the IP does not exist in the database, fetch the data from the ipstack.com API, save it to the database, and return the response.
-2. Delete IP Information
-    - This endpoint must allow an IP address to be removed from the local database.
-    - Return a success message upon successful deletion.
-    - Return an appropriate error if the IP is not found.
-3. Blacklist Management
-    - Create two new endpoints to manage a blacklist of IP addresses.
-    - When an IP is in the blacklist, any attempt to retrieve its information using the endpoint must be blocked. The API should return an error response without making any external API calls.
-    - A blacklisted IP should be a separate entity in the database, with a clear relationship to the IP data.
-4. Extra (optional, bonus points)
-   - Bulk endpoints
-   
-## Getting Started
-A Docker environment has been provided for your convenience.
+## Features
 
-1. Make sure you have Docker and Docker Compose installed on your system
-2. Clone this repository
-3. Navigate to the repository directory
-4. Run `docker compose up -d`
-5. Run `docker compose exec php composer install`
-6. Access the API at http://localhost:8080/api/doc
+### Retrieve IP Information
+- Checks the local database first.
+- If data is younger than 1 day, returns the cached entity.
+- If data is older than 1 day, fetches fresh data from ipstack and updates the entity.
+- If the IP does not exist in the database, data is fetched from ipstack and stored automatically.
 
-## Submission:
-- Create a git (Github/Gitlab) repository with your solution
-- Include a README.md explaining how to run your code and any design decisions
-- Ensure your code is well-commented and follows best practices
+### Delete IP Information
+- Deletes a cached IP entity from the database.
+- Returns a success message when the IP is deleted.
+- Returns 404 if the IP is not found.
 
-## Evaluation Criteria:
-- All endpoints must be documented using OpenAPI annotations.
-- Correctness of the implementation
-- Understanding of RESTful API building principles
-- Proper use of built-in PHP & Symfony features
-- Efficient implementation of the functionality
-- Code organization and readability
-- Error handling
-- Test coverage
+### Blacklist Management
+- Add or remove IPs from a dedicated blacklist entity (BlacklistedIp).
+- When an IP is in the blacklist:
+  - any attempt to retrieve its information is blocked,
+  - the API returns 403 and does not call ipstack.
+- Blacklisted IPs can be related to existing IpAddress entities.
+
+### Bulk Endpoints
+- Bulk IP lookup.
+- Bulk blacklist add/remove.
+- Each IP returns a separate success or error status.
+
+### OpenAPI Documentation
+All endpoints are documented with PHP attributes.
+Available at: http://localhost:8080/api/doc
+
+### Test Coverage
+Functional tests cover:
+- API health check,
+- blacklist blocking behavior,
+- deleting cached IP information.
+
+External ipstack calls are mocked.
+
+---
+
+## Running the Project
+
+### Requirements
+- Docker
+- Docker Compose
+
+### Setup
+
+1. Clone the repository:
+   git clone <your-repo-url>
+   cd junior-php-2025
+
+2. Start Docker:
+   docker compose up -d
+
+3. Install dependencies:
+   docker compose exec php composer install
+
+4. Run migrations:
+   docker compose exec php bin/console doctrine:migrations:migrate --no-interaction
+
+5. Open Swagger documentation:
+   http://localhost:8080/api/doc
+
+---
+
+## Environment Variables
+
+### .env
+A minimal `.env` file is used for development (APP_ENV, APP_SECRET, DATABASE_URL, etc.).
+
+## Endpoints
+
+### Health Check
+GET /api/health
+
+### IP Information
+GET    /api/ip/{ip}
+DELETE /api/ip/{ip}
+POST   /api/ip/bulk
+
+### Blacklist
+POST   /api/blacklist
+DELETE /api/blacklist/{ip}
+POST   /api/blacklist/bulk
+DELETE /api/blacklist/bulk
+
+---
+
+## Running Tests
+
+docker compose exec php php bin/phpunit
+
+Tests:
+- reset DB between runs,
+- mock ipstack,
+- verify blacklist behavior and cache logic.
+
+---
+
+## Design Decisions
+
+- Business logic placed inside IpService to keep controllers clean.
+- Entity structure:
+  - IpAddress stores IP information and timestamp.
+  - BlacklistedIp stores blacklisted addresses with optional relation.
+- Cache implemented via updatedAt timestamp (simple and efficient for this use-case).
+- Blacklist is checked before any external API call.
+- External API isolated in IpstackClient for better testability.
+- Bulk endpoints reuse the same logic but wrap results individually.
+- OpenAPI attributes used for clear, code-based API documentation.
+
+---
+
+## What I Learned
+
+- Better understanding of Symfony service structure and separating responsibilities.
+- Working with Symfony HttpClient and handling API responses.
+- Returning accurate HTTP error codes.
+- Documenting API endpoints using OpenAPI attributes.
+- Writing functional tests, mocking external services, and preparing test environments.
+
+---
+
+## Data Flow Overview
+
+User Request (GET /api/ip/{ip})
+        |
+        v
+    IpController
+        |
+        v
+     IpService
+        |
+        |-- 1. Validate IP format
+        |
+        |-- 2. Check blacklist table
+        |       If blacklisted -> return 403
+        |
+        |-- 3. Check local database (IpAddress entity)
+        |       If exists and updatedAt < 1 day -> return cached entity
+        |
+        |-- 4. Call ipstack via IpstackClient
+        |
+        |-- 5. Save or update IpAddress entity
+        |
+        v
+Return JSON response
+
+---
+
+## Evaluation Criteria Checklist
+
+REST API implemented: yes  
+Cache logic: yes  
+External API usage: yes  
+Blacklist logic: yes  
+Bulk endpoints: yes  
+OpenAPI documentation: yes  
+Docker environment: yes  
+Tests included: yes  
+Code readability and comments: yes  
