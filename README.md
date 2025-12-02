@@ -21,123 +21,141 @@ The project is built with Symfony 6, PHP 8.4, Doctrine ORM, Docker and is docume
 - Returns 404 if the IP is not found.
 
 ### Blacklist Management
-- Add or remove IPs from a dedicated blacklist entity (BlacklistedIp).
-- When an IP is in the blacklist:
-  - any attempt to retrieve its information is blocked,
-  - the API returns 403 and does not call ipstack.
-- Blacklisted IPs can be related to existing IpAddress entities.
+- Add or remove IPs from a dedicated blacklist entity.
+- When an IP is blacklisted:
+  - Any request for its information returns 403.
+  - The API does not contact ipstack.
+- Blacklisted IPs may relate to stored IpAddress entities.
 
 ### Bulk Endpoints
 - Bulk IP lookup.
 - Bulk blacklist add/remove.
-- Each IP returns a separate success or error status.
+- Each IP returns an individual success or error result.
 
 ### OpenAPI Documentation
-All endpoints are documented with PHP attributes.
+All endpoints are documented with PHP attributes.  
 Available at: http://localhost:8080/api/doc
 
 ### Test Coverage
-Functional tests cover:
+Functional tests verify:
 - API health check,
 - blacklist blocking behavior,
-- deleting cached IP information.
+- cache deletion and refresh logic.
 
-External ipstack calls are mocked.
+External ipstack calls are fully mocked.
 
 ---
 
 ## Running the Project
 
 ### Requirements
-- Docker
-- Docker Compose
+- Docker  
+- Docker Compose  
 
 ### Setup
 
-1. Clone the repository:
-   git clone <your-repo-url>
-   cd junior-php-2025
+```bash
+# 1. Clone repository
+git clone <your-repo-url>
+cd junior-php-2025
 
-2. Start Docker:
-   docker compose up -d
+# 2. Start Docker stack
+docker compose up -d
 
-3. Install dependencies:
-   docker compose exec php composer install
+# 3. Install PHP dependencies
+docker compose exec php composer install
 
-4. Run migrations:
-   docker compose exec php bin/console doctrine:migrations:migrate --no-interaction
+# 4. Run migrations
+docker compose exec php bin/console doctrine:migrations:migrate --no-interaction
 
-5. Open Swagger documentation:
-   http://localhost:8080/api/doc
+# 5. Access documentation
+open http://localhost:8080/api/doc
+```
 
 ---
 
 ## Environment Variables
 
-### .env
-A minimal `.env` file is used for development (APP_ENV, APP_SECRET, DATABASE_URL, etc.).
+A minimal `.env` file is used for development:
+
+```
+APP_ENV=dev
+APP_SECRET=your_secret
+DATABASE_URL=mysql://user:pass@db:3306/app
+API_KEY_IPSTACK=your_api_key_here
+```
+
+---
 
 ## Endpoints
 
 ### Health Check
+```
 GET /api/health
+```
 
 ### IP Information
+```
 GET    /api/ip/{ip}
 DELETE /api/ip/{ip}
 POST   /api/ip/bulk
+```
 
 ### Blacklist
+```
 POST   /api/blacklist
 DELETE /api/blacklist/{ip}
 POST   /api/blacklist/bulk
 DELETE /api/blacklist/bulk
+```
 
 ---
 
 ## Running Tests
 
+```bash
 docker compose exec php php bin/phpunit
+```
 
 Tests:
-- reset DB between runs,
-- mock ipstack,
-- verify blacklist behavior and cache logic.
+- Database reset per run
+- External API mocked
+- Blacklist enforcement tested
+- Cache logic verified
 
 ---
 
 ## Design Decisions
 
-- Business logic placed inside IpService to keep controllers clean.
-- Entity structure:
-  - IpAddress stores IP information and timestamp.
-  - BlacklistedIp stores blacklisted addresses with optional relation.
-- Cache implemented via updatedAt timestamp (simple and efficient for this use-case).
+- Business logic centralized in `IpService`.
+- External API calls contained in `IpstackClient` for testability.
+- Cache uses `updatedAt` timestamp to determine refresh necessity.
 - Blacklist is checked before any external API call.
-- External API isolated in IpstackClient for better testability.
-- Bulk endpoints reuse the same logic but wrap results individually.
-- OpenAPI attributes used for clear, code-based API documentation.
+- Doctrine entities:
+  - `IpAddress` stores IP info, metadata, timestamps.
+  - `BlacklistedIp` stores blacklisted entries.
+- Bulk endpoints reuse existing service logic.
 
 ---
 
 ## What I Learned
 
-- Better understanding of Symfony service structure and separating responsibilities.
-- Working with Symfony HttpClient and handling API responses.
-- Returning accurate HTTP error codes.
-- Documenting API endpoints using OpenAPI attributes.
-- Writing functional tests, mocking external services, and preparing test environments.
+- Writing clean Symfony service structures.
+- Proper use of HttpClient and handling API responses.
+- Returning correct HTTP error codes in REST APIs.
+- Using OpenAPI attributes for API documentation.
+- Writing functional tests with mocks and test environments.
 
 ---
 
 ## Evaluation Criteria Checklist
 
 REST API implemented: yes  
-Cache logic: yes  
+Cache logic implemented: yes  
 External API usage: yes  
 Blacklist logic: yes  
-Bulk endpoints: yes  
+Bulk endpoints implemented: yes  
 OpenAPI documentation: yes  
 Docker environment: yes  
 Tests included: yes  
-Code readability and comments: yes  
+Code readability: yes  
